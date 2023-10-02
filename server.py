@@ -1,35 +1,52 @@
+import argparse
 import socket
 import threading
 
 # Server configuration
-HOST = "127.0.0.1"
+parser = argparse.ArgumentParser(description="Server for streaming video")
+
+parser.add_argument(
+    "-a",
+    "--ip",
+    type=str,
+    default="179.24.154.92",
+    help="IP address of the server",
+)
+parser.add_argument(
+    "-p", "--port", type=int, default=32768, help="TCP port of the server"
+)
+
+args = parser.parse_args()
+
+server_ip = args.ip
+server_port = args.port
+
 UDP_PORT = 65534
-TCP_PORT = 32768
 
 
 # Create clients list
-connected_clients = []
+connected_clients = [{"ip": "127.0.0.1", "port": 32769, "vlc_port": 65531}]
 
 
 # Create a UDP socket
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp_socket.bind((HOST, UDP_PORT))
+udp_socket.bind((server_ip, UDP_PORT))
 
 print("UDP socket listening on port", UDP_PORT)
 
 
 # Create a TCP socket
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind((HOST, TCP_PORT))
+server_socket.bind((server_ip, server_port))
 server_socket.listen(5)
 
-print("TCP socket listening on port", TCP_PORT)
+print("TCP socket listening on port", server_port)
 
 
 def receive_stream():
     while True:
         # Receive a datagram from VLC media player
-        data, client_addr = udp_socket.recvfrom(1024)
+        data, client_addr = udp_socket.recvfrom(32768)
         print("Received datagram from", client_addr)
 
         # Send the datagram to all connected clients
