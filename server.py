@@ -9,7 +9,7 @@ parser.add_argument(
     "-a",
     "--ip",
     type=str,
-    default="179.24.154.92",
+    default="127.0.0.1",
     help="IP address of the server",
 )
 parser.add_argument(
@@ -18,9 +18,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-server_ip = args.ip
-server_port = args.port
-
+HOST = args.ip
+TCP_PORT = args.port
 UDP_PORT = 65534
 
 
@@ -30,17 +29,17 @@ connected_clients = [{"ip": "127.0.0.1", "port": 32769, "vlc_port": 65531}]
 
 # Create a UDP socket
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp_socket.bind((server_ip, UDP_PORT))
+udp_socket.bind((HOST, UDP_PORT))
 
 print("UDP socket listening on port", UDP_PORT)
 
 
 # Create a TCP socket
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind((server_ip, server_port))
+server_socket.bind((HOST, TCP_PORT))
 server_socket.listen(5)
 
-print("TCP socket listening on port", server_port)
+print("TCP socket listening on port", TCP_PORT)
 
 
 def receive_stream():

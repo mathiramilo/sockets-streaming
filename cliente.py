@@ -1,5 +1,6 @@
-from argparse import ArgumentParser
 import socket
+from argparse import ArgumentParser
+
 from protocol import ControlStream
 
 """
@@ -14,7 +15,7 @@ python cliente.py <ServerIP> <ServerPort> <PuertoVLC>
 
 class ClientControlTCP:
     """
-    Sera usado por los usuarios finales para iniciar, interrumpir, 
+    Sera usado por los usuarios finales para iniciar, interrumpir,
     continuar y cerrar su sesión de streaming
 
     El cliente debe implementar una consola de texto para leer comandos
@@ -100,17 +101,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "server_ip",
         help="Dirección IP del servidor al que se desea conectar",
-        default="127.0.0.1"
+        default="127.0.0.1",
     )
     parser.add_argument(
         "server_port",
         help="Puerto del servidor al que se desea conectar",
         default=2023,
-        type=int
+        type=int,
     )
     parser.add_argument(
         "vlc_port",
-        help="Puerto de la instancia de VLC del cliente usada para reproducir el stream"
+        help="Puerto de la instancia de VLC del cliente usada para reproducir el stream",
     )
     args = parser.parse_args()
 
