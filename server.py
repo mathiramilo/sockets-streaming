@@ -1,19 +1,19 @@
-import argparse
 import socket
 import threading
+from argparse import ArgumentParser
 
-# Server configuration
-parser = argparse.ArgumentParser(description="Server for streaming video")
+# Parse and get arguments
+parser = ArgumentParser(description="Video streaming server")
 
 parser.add_argument(
-    "-a",
-    "--ip",
+    "ip",
     type=str,
+    nargs="?",
     default="127.0.0.1",
     help="IP address of the server",
 )
 parser.add_argument(
-    "-p", "--port", type=int, default=32768, help="TCP port of the server"
+    "port", type=int, nargs="?", default=32768, help="TCP port of the server"
 )
 
 args = parser.parse_args()
@@ -22,9 +22,11 @@ HOST = args.ip
 TCP_PORT = args.port
 UDP_PORT = 65534
 
+print("Server running on", HOST)
+
 
 # Create clients list
-connected_clients = [{"ip": "127.0.0.1", "port": 32769, "vlc_port": 65531}]
+connected_clients = []
 
 
 # Create a UDP socket
@@ -48,7 +50,7 @@ def receive_stream():
         data, client_addr = udp_socket.recvfrom(32768)
         print("Received datagram from", client_addr)
 
-        # Send the datagram to all connected clients
+        # Send the datagram to all connected clients (TODO?: create a thread for each client)
         for client in connected_clients:
             udp_socket.sendto(data, (client["ip"], client["vlc_port"]))
 
