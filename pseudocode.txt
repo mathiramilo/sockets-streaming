@@ -1,0 +1,130 @@
+// Servidor:
+
+// 1. Escucha en el puerto destino del VLC media player (65534 en el ejemplo), que recibe el stream.
+// 2. Posteriormente levanta el puerto ServerPort en la IP ServerIP, donde recibe solicitudes de conexion de los clientes.
+
+connected_clients = []
+
+// Creamos socket UDP por el cual se recibira el stream
+skt = socket.udp()
+skt.bind(“127.0.0.1”, 65534)
+
+// Creamos socket TCP por el cual se recibiran las conexiones y solicitudes de los clientes
+master = socket.tcp()
+master.bind(ServerIP, ServerPort)
+server = master.listen()
+
+// Creamos 2 hilos, uno para recibir el stream e irlo guardando y otro para recibir
+paralelamente las conexiones y solicitudes de los usuarios.
+thread.new(recibir_stream, skt)
+thread.new(recibir_conexiones, server)
+
+
+def recibir_stream(skt):
+  while true:
+    // Recibimos datagrama del reproductor VLC
+    datagram, ip, port = skt.receive()
+
+    // Reenviamos el datagrama a todos los clientes conectados
+    // VER: Crear un hilo por cada cliente conectado para mandarle el datagrama
+    for ip, port, vlc_port in conected_clients:
+      skt.sendto(datagram, ip, vlc_port)
+
+
+def recibir_conexiones(server):
+  while true:
+    client, err = server.accept()
+    if (err == ‘timeout’):
+      // Manejo de error
+    thread.new(atender_cliente, client)
+
+
+def atenderCliente(client_skt):
+  client = {}
+  while True:
+    // Leemos el comando enviado por el usuario
+    command = “”
+    repeat
+      data, err = client_skt.receive()
+      command += data
+    until (command.includes(“\n”) or err = “closed”)
+
+    if (err == “closed” or data == nil):
+      break
+
+    // Enviar respuesta “OK\n” al cliente (CHECK: El cliente puede enviar comandos invalidos?)
+    remain = “OK\n”
+    repeat
+      remain, err = client_skt.send(remain)
+    until (remain == ‘’" or err == ‘closed’)
+
+    if (err == ‘closed’):
+      break
+
+    // Tomamos las acciones correspondientes dependiendo del comando
+    if (command.includes(“CONECTAR”)):
+      // Agregamos el cliente a la lista de clientes conectados
+      vlc_port = command.split(“ ”)[1].split(“\”)[0]
+      ip, port = client_skt.getpeer()
+      client = {ip, port, vlc_port}
+      connected_clients.append({ip, port, vlc_port})
+      continue
+
+    if (command == “INTERRUMPIR\n”):
+      conected_clients.remove(client)
+      continue
+
+    if (command == “CONTINUAR\n”):
+      conected_clients.append(client)
+      continue
+
+    if (command == “DESCONECTAR\n”):
+      conected_clients.remove(client)
+      client_skt.close()
+      break
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+
+// Cliente:
+
+// 1. Se comunica con el servidor mediante el protocolo CONTROLSTREAM.
+
+def cliente():
+  master = socket.tcp()
+  client, err = master.connect(ServerIP, ServerPort)
+
+  if (client == nil or err == “failure”):
+    master.close()
+    return
+
+  while True:
+    // Leemos el comando ingresado por el cliente
+    cmd = keyb.read()
+    remain = cmd + ‘\n’
+
+    // Enviamos el comando al servidor
+    repeat
+      remain, err = client.send(remain)
+      if (err):
+        master.close()
+        return
+    until (remain == ‘’")
+
+    // Leemos respuesta del servidor
+    buff = ‘’
+    repeat
+      data, err = client.receive()
+      if (data == nil or err == “closed”):
+        print(“Connection to server lost”)
+        master.close()
+        return
+      buff += data
+    until (buff.includes(“OK\n”))
+    print(cmd, buff)
+
+    // Si el comando ingresado es DESCONECTAR cerramos la conexion
+    if (cmd == “DESCONECTAR”):
+      master.close()
+      return

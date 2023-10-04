@@ -3,8 +3,10 @@ from argparse import ArgumentParser
 
 from protocol import ControlStream
 
+
+import os
 """
-usage example:
+usage examplei:
 python cliente.py <ServerIP> <ServerPort> <PuertoVLC>
 
 <ServerIP>: Dirección IP del servidor al que se desea conectar, por ejemplo 127.0.0.1
@@ -31,6 +33,8 @@ class ClientControlTCP:
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.server_ip, self.server_port))
+
+        # self.vlc_pid = os.system(f"vlc rtp://127.0.0.1:{vlc_port}")
 
     def send_message(self, message):
         print(f"[CLIENT] {message}")
@@ -77,9 +81,8 @@ class ClientControlTCP:
             command = input("Command> ")
 
             if command not in ControlStream.__members__.values():
-                print("Unknown command")
-                print(ControlStream.__members__)
-                print(command)
+                print(f"Unknown command {command}. Supported commands:")
+                print(*ControlStream.__members__.values())
                 continue
 
             if command == ControlStream.CONNECT:
@@ -91,6 +94,7 @@ class ClientControlTCP:
             elif command == ControlStream.DISCONNECT:
                 response = self.disconnect()
                 print(f"[SERVER] {response}")
+                # os.kill(self.vlc_pid)
                 break
 
             print(f"[SERVER] {response}")
@@ -115,9 +119,5 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    server_ip = args.server_ip
-    server_port = args.server_port
-    vlc_port = args.vlc_port
-
-    client = ClientControlTCP(server_ip, server_port, vlc_port)
+    client = ClientControlTCP(args.server_ip, args.server_port, args.vlc_port)
     client.run()

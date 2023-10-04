@@ -2,6 +2,8 @@ import socket
 import threading
 from argparse import ArgumentParser
 
+import os
+
 # Parse and get arguments
 parser = ArgumentParser(description="Video streaming server")
 
@@ -22,8 +24,10 @@ HOST = args.ip
 TCP_PORT = args.port
 UDP_PORT = 65534
 
-print("Server running on", HOST)
+print(f"Server running on {HOST}:{TCP_PORT}")
 
+# os.system(
+#    "cvlc -vvv \"../video.mp4\" --sout \"#transcode{vcodec=mp4v,acodec=mpga}:rtp{proto=udp, mux=ts, dst=127.0.0.1, port=65534}\" --loop --ttl 1")
 
 # Create clients list
 connected_clients = []
@@ -48,11 +52,12 @@ def receive_stream():
     while True:
         # Receive a datagram from VLC media player
         data, client_addr = udp_socket.recvfrom(32768)
-        print("Received datagram from", client_addr)
+        # print("Received datagram from", client_addr)
 
         # Send the datagram to all connected clients (TODO?: create a thread for each client)
         for client in connected_clients:
-            udp_socket.sendto(data, (client["ip"], client["vlc_port"]))
+            # print("Sending datagram to", client)
+            udp_socket.sendto(data, (client["ip"], int(client["vlc_port"])))
 
 
 def receive_connections():
@@ -75,12 +80,23 @@ def attend_client(client_skt: socket.socket):
         # Send response to the client "OK\n"
         client_skt.send("OK\n".encode("utf-8"))
 
+        if "DESCONECTAR" in message:
+            # Remove the client from the list and close the connection
+            connected_clients.remove(client)
+            print("Client", client, "disconnected")
+            client_skt.close()
+            break
+
         # Process the message
         if "CONECTAR" in message:
             # Add the client to the list
             client_ip, client_port = client_skt.getpeername()
             client_vlc_port = message.split(" ")[1].split("\\")[0]
-            client = {"ip": client_ip, "port": client_port, "vlc_port": client_vlc_port}
+            client = {
+                "ip": client_ip,
+                "port": client_port,
+                "vlc_port": client_vlc_port
+            }
             connected_clients.append(client)
             print("Client", client, "connected")
             continue
@@ -96,13 +112,6 @@ def attend_client(client_skt: socket.socket):
             connected_clients.append(client)
             print("Client", client, "continued")
             continue
-
-        if "DESCONECTAR" in message:
-            # Remove the client from the list and close the connection
-            connected_clients.remove(client)
-            print("Client", client, "disconnected")
-            client_skt.close()
-            break
 
 
 # Create 2 threads to handle UDP and TCP requests
