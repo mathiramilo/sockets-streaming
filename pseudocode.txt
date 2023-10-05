@@ -3,6 +3,8 @@
 // 1. Escucha en el puerto destino del VLC media player (65534 en el ejemplo), que recibe el stream.
 // 2. Posteriormente levanta el puerto ServerPort en la IP ServerIP, donde recibe solicitudes de conexion de los clientes.
 
+// Definimos un array donde guardaremos los clientes conectados para enviarles el stream
+// Cada vez que un hilo o proceso quiera modificarlo se debe mutuoexcluir
 connected_clients = []
 
 // Creamos socket UDP por el cual se recibira el stream
@@ -14,10 +16,16 @@ master = socket.tcp()
 master.bind(ServerIP, ServerPort)
 server = master.listen()
 
-// Creamos 2 hilos, uno para recibir el stream e irlo guardando y otro para recibir
-paralelamente las conexiones y solicitudes de los usuarios.
+// Creamos un hilo para recibir el stream y enviarlo a todos los clientes conectados
 thread.new(recibir_stream, skt)
 thread.new(recibir_conexiones, server)
+
+// Bucle principal del servidor, recibimos conexiones y solicitudes de los clientes.
+while true:
+  client, err = server.accept()
+  if (err == "timeout"):
+    // Manejo de error
+  thread.new(atender_cliente, client)
 
 
 def recibir_stream(skt):
@@ -29,14 +37,6 @@ def recibir_stream(skt):
     // VER: Crear un hilo por cada cliente conectado para mandarle el datagrama
     for ip, port, vlc_port in conected_clients:
       skt.sendto(datagram, ip, vlc_port)
-
-
-def recibir_conexiones(server):
-  while true:
-    client, err = server.accept()
-    if (err == ‘timeout’):
-      // Manejo de error
-    thread.new(atender_cliente, client)
 
 
 def atenderCliente(client_skt):
@@ -56,9 +56,9 @@ def atenderCliente(client_skt):
     remain = “OK\n”
     repeat
       remain, err = client_skt.send(remain)
-    until (remain == ‘’" or err == ‘closed’)
+    until (remain == "" or err == "closed")
 
-    if (err == ‘closed’):
+    if (err == "closed"):
       break
 
     // Tomamos las acciones correspondientes dependiendo del comando
@@ -102,7 +102,7 @@ def cliente():
   while True:
     // Leemos el comando ingresado por el cliente
     cmd = keyb.read()
-    remain = cmd + ‘\n’
+    remain = cmd + "\n"
 
     // Enviamos el comando al servidor
     repeat
@@ -110,10 +110,10 @@ def cliente():
       if (err):
         master.close()
         return
-    until (remain == ‘’")
+    until (remain == "")
 
     // Leemos respuesta del servidor
-    buff = ‘’
+    buff = ""
     repeat
       data, err = client.receive()
       if (data == nil or err == “closed”):

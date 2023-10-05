@@ -3,8 +3,6 @@ from argparse import ArgumentParser
 
 from protocol import ControlStream
 
-
-import os
 """
 usage examplei:
 python cliente.py <ServerIP> <ServerPort> <PuertoVLC>
@@ -33,8 +31,6 @@ class ClientControlTCP:
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.server_ip, self.server_port))
-
-        # self.vlc_pid = os.system(f"vlc rtp://127.0.0.1:{vlc_port}")
 
     def send_message(self, message):
         print(f"[CLIENT] {message}")
@@ -94,7 +90,6 @@ class ClientControlTCP:
             elif command == ControlStream.DISCONNECT:
                 response = self.disconnect()
                 print(f"[SERVER] {response}")
-                # os.kill(self.vlc_pid)
                 break
 
             print(f"[SERVER] {response}")
@@ -110,7 +105,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "server_port",
         help="Puerto del servidor al que se desea conectar",
-        default=2023,
+        default=32768,
         type=int,
     )
     parser.add_argument(
