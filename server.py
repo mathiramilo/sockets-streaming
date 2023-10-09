@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 from protocol import ControlStream
 
-import os
+import sys
 
 # Parse and get arguments
 parser = ArgumentParser(description="Video streaming server")
@@ -68,63 +68,80 @@ def receive_stream():
 def attend_client(client_skt: socket.socket):
     client = {}
     while True:
-        # Receive a message from the client
-        message = client_skt.recv(1024).decode("utf-8")
+        try:
+            # Receive a message from the client
+            message = client_skt.recv(1024).decode("utf-8")
 
-        if message not in ControlStream.__members__.values():
-            print(f"Unknown command {message}. Supported commands:")
-            print(*ControlStream.__members__.values())
-            client_skt.send("[BAD REQUEST] Unknown command\n".encode("utf-8"))
-            continue
+            message = message.strip()
 
-        client_skt.send("OK\n".encode("utf-8"))
+            # Process the message
+            if message.split(" ")[0] == ControlStream.CONNECT:
+                # Add the client to the list
+                client_ip, client_port = client_skt.getpeername()
+                message = message.split(" ")
+                if len(message) < 2:
+                    client_skt.send(
+                        "[BAD REQUEST] VLC Port missing\n".encode("utf-8"))
+                    continue
+                client_vlc_port = message[1].split("\\")[0]
+                try:
+                    client_vlc_port = int(client_vlc_port)
+                except:
+                    client_skt.send(
+                        "[BAD REQUEST] VLC Port must be a number\n".encode("utf-8"))
+                    continue
+                client = {"ip": client_ip, "port": client_port,
+                          "vlc_port": client_vlc_port}
 
-        if message == ControlStream.DISCONNECT:
-            # Remove the client from the list and close the connection
-            with clients_lock:
-                if client in connected_clients:
-                    connected_clients.remove(client)
+                with clients_lock:
+                    if client not in connected_clients:
+                        connected_clients.append(client)
 
-            print("Client", client, "disconnected")
-            client_skt.close()
-            print(connected_clients)
-            continue
+                print("Client", client, "connected")
+                print(connected_clients)
+                continue
 
-        # Process the message
-        if message == ControlStream.CONNECT:
-            # Add the client to the list
-            client_ip, client_port = client_skt.getpeername()
-            client_vlc_port = message.split(" ")[1].split("\\")[0]
-            client = {"ip": client_ip, "port": client_port,
-                      "vlc_port": client_vlc_port}
+            if message not in ControlStream.__members__.values():
+                print(f"Unknown command {message}. Supported commands:")
+                print(*ControlStream.__members__.values())
+                client_skt.send(
+                    "[BAD REQUEST] Unknown command\n".encode("utf-8"))
+                continue
 
-            with clients_lock:
-                if client not in connected_clients:
-                    connected_clients.append(client)
+            client_skt.send("OK\n".encode("utf-8"))
 
-            print("Client", client, "connected")
-            print(connected_clients)
-            continue
+            if message == ControlStream.DISCONNECT:
+                # Remove the client from the list and close the connection
+                with clients_lock:
+                    if client in connected_clients:
+                        connected_clients.remove(client)
 
-        if message == ControlStream.INTERRUPT:
-            # Remove the client from the list
-            with clients_lock:
-                if client in connected_clients:
-                    connected_clients.remove(client)
+                print("Client", client, "disconnected")
+                client_skt.close()
+                print(connected_clients)
+                break
 
-            print("Client", client, "interrupted")
-            print(connected_clients)
-            continue
+            if message == ControlStream.INTERRUPT:
+                # Remove the client from the list
+                with clients_lock:
+                    if client in connected_clients:
+                        connected_clients.remove(client)
 
-        if message == ControlStream.CONTINUE:
-            # Add the client to the list
-            with clients_lock:
-                if client not in connected_clients:
-                    connected_clients.append(client)
+                print("Client", client, "interrupted")
+                print(connected_clients)
+                continue
 
-            print("Client", client, "continued")
-            print(connected_clients)
-            continue
+            if message == ControlStream.CONTINUE:
+                # Add the client to the list
+                with clients_lock:
+                    if client not in connected_clients:
+                        connected_clients.append(client)
+
+                print("Client", client, "continued")
+                print(connected_clients)
+                continue
+        except Exception as e:
+            print(e)
 
 
 # Create 2 threads to handle UDP and TCP requests
@@ -132,11 +149,18 @@ thread1 = threading.Thread(target=receive_stream)
 thread1.start()
 
 if __name__ == "__main__":
-    while True:
-        # Accept a connection from a client
-        client_skt, client_addr = server_socket.accept()
-        print("Accepted connection from", client_addr)
+    try:
+        while True:
+            # Accept a connection from a client
+            client_skt, client_addr = server_socket.accept()
+            print("Accepted connection from", client_addr)
 
-        # Create a thread to attend the client
-        thread = threading.Thread(target=attend_client, args=(client_skt,))
-        thread.start()
+            # Create a thread to attend the client
+            thread = threading.Thread(target=attend_client, args=(client_skt,))
+            thread.start()
+    except KeyboardInterrupt:
+        print("Closing server...")
+        server_socket.close()
+        udp_socket.close()
+        print("Resources released.")
+        sys.exit(0)
