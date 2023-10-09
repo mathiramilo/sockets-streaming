@@ -73,7 +73,7 @@ class ClientControlTCP:
         return response
 
     def run(self):
-        self.connect()
+        print(self.connect())
 
         while True:
             command = input("Command> ")
