@@ -79,7 +79,7 @@ def attend_client(client_skt: socket.socket):
                 # Add the client to the list
                 client_ip, client_port = client_skt.getpeername()
                 message = message.split(" ")
-                if len(message) < 2:
+                if len(message) != 2:
                     client_skt.send(
                         "[BAD REQUEST] VLC Port missing\n".encode("utf-8"))
                     continue
