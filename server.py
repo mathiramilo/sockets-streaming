@@ -2,6 +2,10 @@ import socket
 import threading
 from argparse import ArgumentParser
 
+from protocol import ControlStream
+
+import os
+
 # Parse and get arguments
 parser = ArgumentParser(description="Video streaming server")
 
@@ -21,6 +25,7 @@ args = parser.parse_args()
 HOST = args.ip
 TCP_PORT = args.port
 UDP_PORT = 65534
+UDP_BUFFER_SIZE = 32768
 
 print(f"Server running on {HOST}:{TCP_PORT}")
 
@@ -50,13 +55,14 @@ print("TCP socket listening on port", TCP_PORT)
 def receive_stream():
     while True:
         # Receive a datagram from VLC media player
-        data, client_addr = udp_socket.recvfrom(32768)
+        data, client_addr = udp_socket.recvfrom(UDP_BUFFER_SIZE)
         # print("Received datagram from", client_addr)
 
-        # Send the datagram to all connected clients (TODO: mutuoexclude connected_clients?)
+        # Send the datagram to all connected clients
+        # mutex for connected_client
         for client in connected_clients:
-            # print("Sending datagram to", client)
-            udp_socket.sendto(data, (client["ip"], int(client["vlc_port"])))
+            udp_socket.sendto(
+                data, (client["ip"], int(client["vlc_port"])))
 
 
 def attend_client(client_skt: socket.socket):
@@ -65,15 +71,32 @@ def attend_client(client_skt: socket.socket):
         # Receive a message from the client
         message = client_skt.recv(1024).decode("utf-8")
 
-        # Send response to the client "OK\n"
+        if message not in ControlStream.__members__.values():
+            print(f"Unknown command {message}. Supported commands:")
+            print(*ControlStream.__members__.values())
+            client_skt.send("[BAD REQUEST] Unknown command\n".encode("utf-8"))
+            continue
+
         client_skt.send("OK\n".encode("utf-8"))
 
+        if message == ControlStream.DISCONNECT:
+            # Remove the client from the list and close the connection
+            with clients_lock:
+                if client in connected_clients:
+                    connected_clients.remove(client)
+
+            print("Client", client, "disconnected")
+            client_skt.close()
+            print(connected_clients)
+            continue
+
         # Process the message
-        if "CONECTAR" in message:
+        if message == ControlStream.CONNECT:
             # Add the client to the list
             client_ip, client_port = client_skt.getpeername()
             client_vlc_port = message.split(" ")[1].split("\\")[0]
-            client = {"ip": client_ip, "port": client_port, "vlc_port": client_vlc_port}
+            client = {"ip": client_ip, "port": client_port,
+                      "vlc_port": client_vlc_port}
 
             with clients_lock:
                 if client not in connected_clients:
@@ -83,7 +106,7 @@ def attend_client(client_skt: socket.socket):
             print(connected_clients)
             continue
 
-        if "INTERRUMPIR" in message:
+        if message == ControlStream.INTERRUPT:
             # Remove the client from the list
             with clients_lock:
                 if client in connected_clients:
@@ -93,7 +116,7 @@ def attend_client(client_skt: socket.socket):
             print(connected_clients)
             continue
 
-        if "CONTINUAR" in message:
+        if message == ControlStream.CONTINUE:
             # Add the client to the list
             with clients_lock:
                 if client not in connected_clients:
@@ -102,17 +125,6 @@ def attend_client(client_skt: socket.socket):
             print("Client", client, "continued")
             print(connected_clients)
             continue
-
-        if "DESCONECTAR" in message:
-            # Remove the client from the list and close the connection
-            with clients_lock:
-                if client in connected_clients:
-                    connected_clients.remove(client)
-
-            print("Client", client, "disconnected")
-            client_skt.close()
-            print(connected_clients)
-            break
 
 
 # Create 2 threads to handle UDP and TCP requests
