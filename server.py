@@ -1,10 +1,9 @@
 import socket
+import sys
 import threading
 from argparse import ArgumentParser
 
 from protocol import ControlStream
-
-import sys
 
 # Parse and get arguments
 parser = ArgumentParser(description="Video streaming server")
@@ -54,15 +53,17 @@ print("TCP socket listening on port", TCP_PORT)
 
 def receive_stream():
     while True:
-        # Receive a datagram from VLC media player
-        data, client_addr = udp_socket.recvfrom(UDP_BUFFER_SIZE)
-        # print("Received datagram from", client_addr)
+        try:
+            # Receive a datagram from VLC media player
+            data, client_addr = udp_socket.recvfrom(UDP_BUFFER_SIZE)
+            # print("Received datagram from", client_addr)
 
-        # Send the datagram to all connected clients
-        # mutex for connected_client
-        for client in connected_clients:
-            udp_socket.sendto(
-                data, (client["ip"], int(client["vlc_port"])))
+            # Send the datagram to all connected clients
+            # mutex for connected_client
+            for client in connected_clients:
+                udp_socket.sendto(data, (client["ip"], int(client["vlc_port"])))
+        except Exception as e:
+            print(e)
 
 
 def attend_client(client_skt: socket.socket):
@@ -80,35 +81,39 @@ def attend_client(client_skt: socket.socket):
                 client_ip, client_port = client_skt.getpeername()
                 message = message.split(" ")
                 if len(message) != 2:
-                    client_skt.send(
-                        "[BAD REQUEST] VLC Port missing\n".encode("utf-8"))
+                    client_skt.send("[BAD REQUEST] VLC Port missing\n".encode("utf-8"))
                     continue
                 client_vlc_port = message[1].split("\\")[0]
                 try:
                     client_vlc_port = int(client_vlc_port)
                 except:
                     client_skt.send(
-                        "[BAD REQUEST] VLC Port must be a number\n".encode("utf-8"))
+                        "[BAD REQUEST] VLC Port must be a number\n".encode("utf-8")
+                    )
                     continue
-                client = {"ip": client_ip, "port": client_port,
-                          "vlc_port": client_vlc_port}
+
+                client = {
+                    "ip": client_ip,
+                    "port": client_port,
+                    "vlc_port": client_vlc_port,
+                }
 
                 with clients_lock:
                     if client not in connected_clients:
                         connected_clients.append(client)
 
                 print("Client", client, "connected")
-                print(connected_clients)
+                print(
+                    f"{len(connected_clients)} connected clients: {connected_clients}"
+                )
+                client_skt.send("OK\n".encode("utf-8"))
                 continue
 
             if message not in ControlStream.__members__.values():
                 print(f"Unknown command {message}. Supported commands:")
                 print(*ControlStream.__members__.values())
-                client_skt.send(
-                    "[BAD REQUEST] Unknown command\n".encode("utf-8"))
+                client_skt.send("[BAD REQUEST] Unknown command\n".encode("utf-8"))
                 continue
-
-            client_skt.send("OK\n".encode("utf-8"))
 
             if message == ControlStream.DISCONNECT:
                 # Remove the client from the list and close the connection
@@ -117,8 +122,11 @@ def attend_client(client_skt: socket.socket):
                         connected_clients.remove(client)
 
                 print("Client", client, "disconnected")
+                print(
+                    f"{len(connected_clients)} connected clients: {connected_clients}"
+                )
+                client_skt.send("OK\n".encode("utf-8"))
                 client_skt.close()
-                print(connected_clients)
                 break
 
             if message == ControlStream.INTERRUPT:
@@ -128,7 +136,10 @@ def attend_client(client_skt: socket.socket):
                         connected_clients.remove(client)
 
                 print("Client", client, "interrupted")
-                print(connected_clients)
+                print(
+                    f"{len(connected_clients)} connected clients: {connected_clients}"
+                )
+                client_skt.send("OK\n".encode("utf-8"))
                 continue
 
             if message == ControlStream.CONTINUE:
@@ -138,18 +149,21 @@ def attend_client(client_skt: socket.socket):
                         connected_clients.append(client)
 
                 print("Client", client, "continued")
-                print(connected_clients)
+                print(
+                    f"{len(connected_clients)} connected clients: {connected_clients}"
+                )
+                client_skt.send("OK\n".encode("utf-8"))
                 continue
         except Exception as e:
             print(e)
 
 
-# Create 2 threads to handle UDP and TCP requests
-thread1 = threading.Thread(target=receive_stream)
-thread1.start()
-
 if __name__ == "__main__":
     try:
+        # Create a thread to handle video streaming
+        streaming_thread = threading.Thread(target=receive_stream)
+        streaming_thread.start()
+
         while True:
             # Accept a connection from a client
             client_skt, client_addr = server_socket.accept()
