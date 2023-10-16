@@ -94,7 +94,11 @@ class ClientControlTCP:
                 print(f"[SERVER] {response}")
                 break
 
-            print(f"[SERVER] {response}")
+            if not response:
+                print("[SERVER] Connection closed")
+                break
+            else:
+                print(f"[SERVER] {response}")
 
 
 if __name__ == "__main__":

@@ -37,6 +37,8 @@ logging.info(f"Server running on {HOST}:{TCP_PORT}")
 
 # Create a Lock to control the access to the clients list
 clients_lock = threading.Lock()
+# Add a flag to signal the threads to exit gracefully
+exit_flag = threading.Event()
 
 # Create clients list
 connected_clients = []
@@ -58,7 +60,7 @@ logging.info(f"TCP socket listening on port {TCP_PORT}")
 
 
 def receive_stream():
-    while True:
+    while not exit_flag.is_set():
         try:
             # Receive a datagram from VLC media player
             data, client_addr = udp_socket.recvfrom(UDP_BUFFER_SIZE)
@@ -74,7 +76,11 @@ def receive_stream():
 
 def attend_client(client_skt: socket.socket):
     client = {}
-    while True:
+    # needed to avoid blocking the thread when receiving data
+    # otherwise, the thread will
+    client_skt.settimeout(10)
+
+    while not exit_flag.is_set():
         try:
             # Receive a message from the client
             message = client_skt.recv(1024).decode("utf-8")
@@ -133,8 +139,6 @@ def attend_client(client_skt: socket.socket):
                     f"{len(connected_clients)} connected clients: {connected_clients}"
                 )
                 client_skt.send("OK\n".encode("utf-8"))
-                client_skt.close()
-                logging.debug(f"Closing connection with {client}")
                 break
 
             if message == ControlStream.INTERRUPT:
@@ -165,6 +169,11 @@ def attend_client(client_skt: socket.socket):
         except Exception as e:
             logging.debug(e)
 
+    # if the client disconnects, or the main thread signaled to exit
+    # close the connection
+    logging.info(f"Closing connection with {client}")
+    client_skt.close()
+
 
 if __name__ == "__main__":
     try:
@@ -180,10 +189,24 @@ if __name__ == "__main__":
             # Create a thread to attend the client
             thread = threading.Thread(target=attend_client, args=(client_skt,))
             thread.start()
+
     except KeyboardInterrupt:
         logging.info("Closing server...")
         logging.debug(f"Closing {server_socket} and {udp_socket}")
-        server_socket.close()
+
+        # Set the exit flag to signal threads to exit
+        exit_flag.set()
+
+        streaming_thread.join()
+        logging.debug("Streaming thread joined")
         udp_socket.close()
-        logging.info("Resources released.")
+
+        # wait for all attend_client threads to finish
+        for thread in threading.enumerate():
+            if thread is not threading.current_thread():
+                thread.join()
+                logging.debug(f"Thread {thread.getName()} joined")
+
+        server_socket.close()
+        logging.info("Resources gracefully released.")
         sys.exit(0)
