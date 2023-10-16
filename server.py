@@ -205,7 +205,7 @@ if __name__ == "__main__":
         for thread in threading.enumerate():
             if thread is not threading.current_thread():
                 thread.join()
-                logging.debug(f"Thread {thread.getName()} joined")
+                logging.debug(f"Thread {thread.name} joined")
 
         server_socket.close()
         logging.info("Resources gracefully released.")
