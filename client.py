@@ -117,4 +117,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     client = ClientControlTCP(args.server_ip, args.server_port, args.vlc_port)
-    client.run()
+    try:
+        client.run()
+    except KeyboardInterrupt:
+        client.disconnect()
