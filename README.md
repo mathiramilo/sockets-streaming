@@ -1,3 +1,5 @@
+![logo-fing-udelar](https://github.com/mathiramilo/sockets-streaming/assets/42822912/e2a6ee33-c40e-4e29-8965-935782f701e3)
+
 ## Sockets Streaming
 
 Servidor de streaming de video y cliente que consume el video con determinadas acciones de control. Proyecto para el curso de Redes de Computadoras de la Facultad de Ingenieria UDELAR.
